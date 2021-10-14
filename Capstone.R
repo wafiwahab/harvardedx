@@ -38,7 +38,8 @@ movielens <- left_join(ratings, movies, by = "movieId")
 
 #add features to original dataset, so test set has the same features
 #features- release year, title, rating date, rating hour
-movielens <- movielens %>% mutate(release_yr = parse_number(title)) %>%
+movielens <- movielens %>%
+  mutate(release_yr = parse_number(str_split(trial$title, pattern = "\\(", simplify = TRUE)[,2])) %>%
   mutate(title = str_split(title, pattern = "\\(", simplify = TRUE)[,1]) %>%
   mutate(rating_date = date(as_datetime(timestamp[1]))) %>%
   mutate(rating_hour = hour(as_datetime(edx$timestamp[1])))
@@ -127,9 +128,7 @@ edx %>%
 dim(edx) # 9M rows 6 col
 str(edx) 
 
-
-
-#these steps need to happen before the data split as testset need same features
+#these steps need to happen before the data split as testset need same features###
 #timestamp convert integer to date timestamp into relevant date
 # timestamp is in UTC format
 date(as_datetime(edx$timestamp[1])) #UTC timestamp to date
@@ -145,8 +144,16 @@ trial2 <- trial2 %>% mutate(release_yr = parse_number(trial$title)) %>%
   mutate(title = str_split(trial$title, pattern = "\\(", simplify = TRUE)[,1])
 print(trial2)
 #check for duplicates and nulls
+#need a unique identifier timestamp+userid+movieid n_distinct = no. of rows therefore zero duplicates
+#create a table of the high level stats (look at rafa)
+#no. of rows
+dim(edx)[1]
+# no. of unique ratings
 #userid check how many unique userid
+n_distinct(edx$userId)
 #movieid check no. of unique movieids
+n_distinct(edx$movieId)
+
 #ratings distribution of ratings
 
 #feature engineer timestamp 1) movie age 2) release year 3) day of week 4) month
