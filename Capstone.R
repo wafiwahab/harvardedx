@@ -11,6 +11,8 @@ if(!require(data.table)) install.packages("data.table", repos = "http://cran.us.
 library(tidyverse)
 library(caret)
 library(data.table)
+library(lubridate)
+library(stringr)
 
 # MovieLens 10M dataset:
 # https://grouplens.org/datasets/movielens/10m/
@@ -33,6 +35,13 @@ movies <- as.data.frame(movies) %>% mutate(movieId = as.numeric(movieId),
 
 
 movielens <- left_join(ratings, movies, by = "movieId")
+
+#add features to original dataset, so test set has the same features
+#features- release year, title, rating date, rating hour
+movielens <- movielens %>% mutate(release_yr = parse_number(title)) %>%
+  mutate(title = str_split(title, pattern = "\\(", simplify = TRUE)[,1]) %>%
+  mutate(rating_date = date(as_datetime(timestamp[1]))) %>%
+  mutate(rating_hour = hour(as_datetime(edx$timestamp[1])))
 
 # Validation set will be 10% of MovieLens data
 set.seed(1, sample.kind="Rounding") # if using R 3.5 or earlier, use `set.seed(1)`
@@ -118,13 +127,30 @@ edx %>%
 dim(edx) # 9M rows 6 col
 str(edx) 
 
+
+
+#these steps need to happen before the data split as testset need same features
+#timestamp convert integer to date timestamp into relevant date
+# timestamp is in UTC format
+date(as_datetime(edx$timestamp[1])) #UTC timestamp to date
+
+trial <- edx[1:5,]
+trial <- trial %>% mutate(movtitle = str_split(trial$title, pattern = "\\(", simplify = TRUE)[,1]) %>%
+  mutate(release_yr = parse_number(str_split(trial$title, pattern = "\\(", simplify = TRUE)[,2]))
+print(trial)
+#title - strip out release year from title on to a separate column or feature, could possibly be an important feature
+#generate release year of movie
+trial2 <- edx[1:5,]
+trial2 <- trial2 %>% mutate(release_yr = parse_number(trial$title)) %>%
+  mutate(title = str_split(trial$title, pattern = "\\(", simplify = TRUE)[,1])
+print(trial2)
 #check for duplicates and nulls
 #userid check how many unique userid
 #movieid check no. of unique movieids
 #ratings distribution of ratings
-#timestamp convert integer to date timestamp into relevant date
+
 #feature engineer timestamp 1) movie age 2) release year 3) day of week 4) month
-#title - strip out release year from title on to a separate column or feature, could possibly be an important feature
+
 #title - feature engineering sentiment based -> clustering into broad based segments
 #genres - investigate the grouping further # of distinct groups, if can minmize duplicates/permutations
 #genres - feature engineering 1) genre_span_size <- c(1,2,3,4,5) or a class (singular, double, multiple)
