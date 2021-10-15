@@ -153,24 +153,18 @@ print(trial2)
 #arrange(desc(count))
 trial2 <- trial2 %>% separate_rows(genres, sep = "\\|")
 
-genres = c("Drama", "Comedy", "Thriller", "Romance")
-sapply(genres, function(g) {
-  sum(str_detect(edx$genres, g))
-})
-
-str_detect(trial$genres, "\\|")
-str_extract_all(trial$genres, "\\|",simplify = TRUE)
 n_distinct(edx$genres) #797 different type of genre combinations
-# no. of genre are there and what are they?
 
+# no. of genre are there and what are they?
 starttime <- Sys.time()
+
 genre_tab <- edx[,c(1:2,6)] %>% separate_rows(genres, sep = "\\|") %>%
   group_by(genres) %>%
-  summarize(n_movies = n_distinct(movieId)) # this code takes so long
+  summarize(n_movies = n_distinct(movieId), n_ratings = n()) 
 endtime <- Sys.time()
 
-duration <- endtime - starttime #5.85mins shorter
-class(genre_tab)
+duration <- endtime - starttime #5.85mins 
+
 p <- genre_tab %>% ggplot(aes(x = reorder(genres, -n_movies), y = n_movies)) +
   geom_bar(stat = "identity")
 p <- p +
@@ -178,16 +172,30 @@ p <- p +
               x = "# of movies",
               y = "genres") +
   coord_flip() +
-  theme_classic()
+  theme_classic() #most common genre is Drama
 
-edx %>% separate_rows(genres,sep = "\\|") %>% summarise(genre_count = n_distinct(genres))
-class(genre_test)
+p1 <- edx %>% group_by(genres) %>% 
+  summarize(n_movies = n_distinct(movieId)) %>%
+  filter(n_movies > 250) %>%
+  ggplot(aes(x = reorder(genres, -n_movies), y = n_movies)) +
+  geom_bar(stat = "identity")
+p1 <- p1 + coord_flip() +
+  theme_classic() +
+  labs(title = "# of movies by genre",
+       x = "# of movies",
+       y = "genres")
+# indicates in terms of genres, there is a higher proportion of movies in the database
+# that are combination of drama, comedy romance. followed by documentary & horror
+# lets build a table of frequencies by genre 20X2 and 797x2 tables that is sorted
+
+
 #feature engineering - genre
 trial <- trial %>% mutate(genre_count = str_count(trial$genres, "\\|")+1)
 #check for duplicates and nulls
 #need a unique identifier timestamp+userid+movieid n_distinct = no. of rows therefore zero duplicates
 #create a table of the high level stats (look at rafa)
-#no. of rows
+
+#no. of rows/ratings
 dim(edx)[1]
 # no. of unique ratings
 #userid check how many unique userid
