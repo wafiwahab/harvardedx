@@ -163,13 +163,22 @@ str_extract_all(trial$genres, "\\|",simplify = TRUE)
 n_distinct(edx$genres) #797 different type of genre combinations
 # no. of genre are there and what are they?
 
-starttime = sys.time()
-genre_tab <- edx[,c(1,6)] %>% separate_rows(genres, sep = "\\|") %>%
+starttime <- Sys.time()
+genre_tab <- edx[,c(1:2,6)] %>% separate_rows(genres, sep = "\\|") %>%
   group_by(genres) %>%
   summarize(n_movies = n_distinct(movieId)) # this code takes so long
-endtime = Sys.time()
+endtime <- Sys.time()
 
-duration = endtime - starttime
+duration <- endtime - starttime #5.85mins shorter
+class(genre_tab)
+p <- genre_tab %>% ggplot(aes(x = reorder(genres, -n_movies), y = n_movies)) +
+  geom_bar(stat = "identity")
+p <- p +
+  labs(title = "# of movies by genres",
+              x = "# of movies",
+              y = "genres") +
+  coord_flip() +
+  theme_classic()
 
 edx %>% separate_rows(genres,sep = "\\|") %>% summarise(genre_count = n_distinct(genres))
 class(genre_test)
