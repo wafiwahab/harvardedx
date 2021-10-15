@@ -7,12 +7,15 @@
 if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
 if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
 if(!require(data.table)) install.packages("data.table", repos = "http://cran.us.r-project.org")
+install.packages("kableExtra")
 
 library(tidyverse)
 library(caret)
 library(data.table)
 library(lubridate)
 library(stringr)
+library(knitr)
+library(kableExtra)
 
 # MovieLens 10M dataset:
 # https://grouplens.org/datasets/movielens/10m/
@@ -133,7 +136,7 @@ str(edx)
 # timestamp is in UTC format
 date(as_datetime(edx$timestamp[1])) #UTC timestamp to date
 
-trial <- edx[1:5,]
+trial <- edx[1:100,]
 trial <- trial %>% mutate(movtitle = str_split(trial$title, pattern = "\\(", simplify = TRUE)[,1]) %>%
   mutate(release_yr = parse_number(str_split(trial$title, pattern = "\\(", simplify = TRUE)[,2]))
 print(trial)
@@ -143,6 +146,35 @@ trial2 <- edx[1:5,]
 trial2 <- trial2 %>% mutate(release_yr = parse_number(trial$title)) %>%
   mutate(title = str_split(trial$title, pattern = "\\(", simplify = TRUE)[,1])
 print(trial2)
+
+# edx %>% separate_rows(genres, sep = "\\|") %>%
+#group_by(genres) %>%
+#summarize(count = n()) %>%
+#arrange(desc(count))
+trial2 <- trial2 %>% separate_rows(genres, sep = "\\|")
+
+genres = c("Drama", "Comedy", "Thriller", "Romance")
+sapply(genres, function(g) {
+  sum(str_detect(edx$genres, g))
+})
+
+str_detect(trial$genres, "\\|")
+str_extract_all(trial$genres, "\\|",simplify = TRUE)
+n_distinct(edx$genres) #797 different type of genre combinations
+# no. of genre are there and what are they?
+
+starttime = sys.time()
+genre_tab <- edx[,c(1,6)] %>% separate_rows(genres, sep = "\\|") %>%
+  group_by(genres) %>%
+  summarize(n_movies = n_distinct(movieId)) # this code takes so long
+endtime = Sys.time()
+
+duration = endtime - starttime
+
+edx %>% separate_rows(genres,sep = "\\|") %>% summarise(genre_count = n_distinct(genres))
+class(genre_test)
+#feature engineering - genre
+trial <- trial %>% mutate(genre_count = str_count(trial$genres, "\\|")+1)
 #check for duplicates and nulls
 #need a unique identifier timestamp+userid+movieid n_distinct = no. of rows therefore zero duplicates
 #create a table of the high level stats (look at rafa)
