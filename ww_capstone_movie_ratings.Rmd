@@ -93,18 +93,18 @@ The `edx` training dataset has `r rows` rows (number of ratings) and  `r cols` c
 Frequency distribution of ratings are shown in table and figure below (caption and labels on points)
 ```{r rating_freq_tab}
 descr::freq(as.factor(edx$rating), plot = FALSE)
-# no. of "3" ratings  2.12M
-table(edx$rating)
-prop.table(edx$rating)
 ```
 
 ```{r rating_hist, fig.cap = "Frequency of ratings"}
 library(hrbrthemes)
-edx %>% ggplot(aes(x = rating)) + geom_histogram(binwidth = 1,
-                                                 fill="#69b3a2",
-                                                 color="#e9ecef",
-                                                 alpha=0.9) +
-  theme_ipsum()
+library(scales)
+x <- seq(0, 5, 0.5)
+edx %>% ggplot(aes(x = rating)) +
+  geom_histogram(binwidth = 0.5, fill="#69b3a2", color="#e9ecef", alpha=0.9) +
+  stat_bin(binwidth = 0.5, geom ="text", aes(label = ..count..), vjust = -1.5) +
+  theme_ipsum() +
+  scale_y_continuous(label = label_number_si(), limits = c(0, 3e6)) +
+  scale_x_continuous(labels = as.character(x) ,breaks = x)
 ```
 n_distinct(edx$movieId)
 # no. of distinct movies = 10677
