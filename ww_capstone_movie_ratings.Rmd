@@ -1,0 +1,163 @@
+---
+title: "Capstone - Movie Ratings Prediction"
+output: 
+  html_notebook:
+    toc: true
+    toc_float: true
+date: "`r format(Sys.time(), '%d %B %Y')`"
+---
+
+```{r setup, include = FALSE, warning = FALSE}
+knitr::opts_chunk$set(fig.align = 'center', echo = TRUE)
+```
+
+# Project Overview
+This is a capstone project for [HarvardX Data Science - Professional Certificate](http://rmarkdown.rstudio.com) program. 
+Objective of project is to create a move recommendation system using MovieLens dataset, using all tools (in particular ML algorithms) shown throught-out the HarvardX DS program.
+
+## Dataset
+Data assigned for this project is the 10 million ratings version of the [MovieLens dataset](https://grouplens.org/datasets/movielens/10m/).
+There are 72K users in this dataset.
+The dataset is created as follows:
+
+```{r train_validation_dataset}
+if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
+if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
+if(!require(data.table)) install.packages("data.table", repos = "http://cran.us.r-project.org")
+install.packages("kableExtra")
+
+library(tidyverse)
+library(caret)
+library(data.table)
+library(lubridate)
+library(stringr)
+library(knitr)
+library(kableExtra)
+
+# MovieLens 10M dataset:
+# https://grouplens.org/datasets/movielens/10m/
+# http://files.grouplens.org/datasets/movielens/ml-10m.zip
+
+dl <- tempfile()
+download.file("http://files.grouplens.org/datasets/movielens/ml-10m.zip", dl)
+
+ratings <- fread(text = gsub("::", "\t", readLines(unzip(dl, "ml-10M100K/ratings.dat"))),
+                 col.names = c("userId", "movieId", "rating", "timestamp"))
+
+movies <- str_split_fixed(readLines(unzip(dl, "ml-10M100K/movies.dat")), "\\::", 3)
+colnames(movies) <- c("movieId", "title", "genres")
+
+
+# if using R 4.0 or later:
+movies <- as.data.frame(movies) %>% mutate(movieId = as.numeric(movieId),
+                                           title = as.character(title),
+                                           genres = as.character(genres))
+
+
+movielens <- left_join(ratings, movies, by = "movieId")
+
+#add features to original dataset, so test set has the same features
+#features- release year, title, rating date, rating hour
+movielens <- movielens %>%
+  mutate(release_yr = parse_number(str_split(title, pattern = "\\(", simplify = TRUE)[,2])) %>%
+  mutate(title = str_split(title, pattern = "\\(", simplify = TRUE)[,1]) %>%
+  mutate(rating_date = date(as_datetime(timestamp[1]))) %>%
+  mutate(rating_hour = hour(as_datetime(edx$timestamp[1])))
+
+# Validation set will be 10% of MovieLens data
+set.seed(1, sample.kind="Rounding") # if using R 3.5 or earlier, use `set.seed(1)`
+test_index <- createDataPartition(y = movielens$rating, times = 1, p = 0.1, list = FALSE)
+edx <- movielens[-test_index,]
+temp <- movielens[test_index,]
+
+# Make sure userId and movieId in validation set are also in edx set
+validation <- temp %>% 
+  semi_join(edx, by = "movieId") %>%
+  semi_join(edx, by = "userId")
+
+# Add rows removed from validation set back into edx set
+removed <- anti_join(temp, validation)
+edx <- rbind(edx, removed)
+
+rm(dl, ratings, movies, test_index, temp, movielens, removed)
+```
+
+## Data familiarization
+
+```{r dim}
+rows <- dim(edx)[1]
+cols <- dim(edx)[2]
+```
+The `edx` training dataset has `r rows` rows (number of ratings) and  `r cols` columns.  
+
+Frequency distribution of ratings are shown in table and figure below (caption and labels on points)
+```{r rating_freq_tab}
+descr::freq(as.factor(edx$rating), plot = FALSE)
+# no. of "3" ratings  2.12M
+table(edx$rating)
+prop.table(edx$rating)
+```
+
+```{r rating_hist, fig.cap = "Frequency of ratings"}
+library(hrbrthemes)
+edx %>% ggplot(aes(x = rating)) + geom_histogram(binwidth = 1,
+                                                 fill="#69b3a2",
+                                                 color="#e9ecef",
+                                                 alpha=0.9) +
+  theme_ipsum()
+```
+n_distinct(edx$movieId)
+# no. of distinct movies = 10677
+
+n_distinct(edx$userId)
+# no. of distinct users = 98677
+
+genre <- edx %>% group_by(genres) %>%
+  summarize(n = n())
+# no. of ratings for drama genre = 733296
+
+#my attempt below inefficient
+edx %>% filter(str_detect(edx$genres, "Drama") == TRUE) %>% summarize(n = n())
+# drama no. of ratings = 3910127
+edx %>% filter(str_detect(edx$genres, "Comedy") == TRUE) %>% summarize(n = n())
+edx %>% filter(str_detect(edx$genres, "Romance") == TRUE) %>% summarize(n = n())
+edx %>% filter(str_detect(edx$genres, "Thriller") == TRUE) %>% summarize(n = n())
+
+#model answer
+# str_detect
+genres = c("Drama", "Comedy", "Thriller", "Romance")
+sapply(genres, function(g) {
+  sum(str_detect(edx$genres, g))
+})
+
+# separate_rows, much slower!
+# edx %>% separate_rows(genres, sep = "\\|") %>%
+  #group_by(genres) %>%
+  #summarize(count = n()) %>%
+  #arrange(desc(count))
+
+title <- edx %>% group_by(title) %>% summarise(n = n()) %>% arrange(desc(n))
+
+edx %>% group_by(movieId, title) %>%
+  summarize(count = n()) %>%
+  arrange(desc(count))
+
+edx %>% group_by(rating) %>% summarize(count = n()) %>% arrange(desc(count))
+
+#model answer
+edx %>% group_by(rating) %>% summarize(count = n()) %>% top_n(5) %>%
+  arrange(desc(count))
+
+check <- edx %>% mutate(status = if_else(rating %% 1 == 0, "whole", "half")) %>%
+                 group_by(status) %>% summarize(count = n())
+#model answer
+edx %>%
+  group_by(rating) %>%
+  summarize(count = n()) %>%
+  ggplot(aes(x = rating, y = count)) +
+  geom_line()
+```
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
