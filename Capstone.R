@@ -71,7 +71,9 @@ summary(edx)
 
 edx %>% filter(rating == 0) %>% tally()
 edx %>% filter(rating == 3) %>% tally()
-# no. of "3" ratingns  2.12M
+# no. of "3" ratings  2.12M
+table(edx$rating)
+prop.table(edx$rating)
 
 edx %>% ggplot(aes(x = rating)) + geom_histogram()
 hist(edx$rating)

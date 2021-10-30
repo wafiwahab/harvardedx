@@ -2,6 +2,7 @@
 title: "Capstone - Movie Ratings Prediction"
 output: 
   html_notebook:
+    fig_caption: true
     toc: true
     toc_float: true
 date: "`r format(Sys.time(), '%d %B %Y')`"
@@ -90,12 +91,22 @@ cols <- dim(edx)[2]
 ```
 The `edx` training dataset has `r rows` rows (number of ratings) and  `r cols` columns.  
 
-Frequency distribution of ratings are shown in table and figure below (caption and labels on points)
-```{r rating_freq_tab}
-descr::freq(as.factor(edx$rating), plot = FALSE)
-```
+### Exploratory Data Analysis
+#### Rating Distribution
 
-```{r rating_hist, fig.cap = "Frequency of ratings"}
+Frequency distribution of ratings are shown in table 1 and figure 1 below:
+```{r rating_freq_tab}
+rft <- descr::freq(as.factor(edx$rating), plot = FALSE)
+zero_rating <- edx %>% filter(rating == 0) %>%
+  nrow()
+three_rating <- edx %>% filter(rating == 3) %>%
+  nrow()
+kable(rft)
+```
+No. of ratings given zero = `r zero_rating`.
+No. of ratings given three = `r three_rating`.
+
+```{r rating_hist, fig.cap = "Fig. 1.1 Freq. dist. of ratings."}
 library(hrbrthemes)
 library(scales)
 x <- seq(0, 5, 0.5)
@@ -106,22 +117,99 @@ edx %>% ggplot(aes(x = rating)) +
   scale_y_continuous(label = label_number_si(), limits = c(0, 3e6)) +
   scale_x_continuous(labels = as.character(x) ,breaks = x)
 ```
-n_distinct(edx$movieId)
-# no. of distinct movies = 10677
 
-n_distinct(edx$userId)
-# no. of distinct users = 98677
+No. of distinct movies rated = `r n_movies`.
+```{r n_distinct_movies}
+n_movies <- n_distinct(edx$movieId)
+n_movies
+```
+No. of distinct movies by rating
+```{r movie_dist_rating, fig.cap = "Fig 1.2 # of unique movies by ratings"}
+edx %>% group_by(rating) %>% summarize(n_mov = n_distinct(movieId)) %>%
+  ggplot(aes(x = rating, y = n_mov)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label= n_mov, vjust = -1.5)) +
+  ylim(0, 12500) +
+  scale_x_continuous(labels = as.character(x) ,breaks = x) +
+  ylab("no of movies") +
+  theme_ipsum()
+```
 
-genre <- edx %>% group_by(genres) %>%
-  summarize(n = n())
-# no. of ratings for drama genre = 733296
+No. of unique users = `r n_users`.
+```{r n_unique_users}
+n_users <- n_distinct(edx$userId)
+n_users
+```
 
-#my attempt below inefficient
-edx %>% filter(str_detect(edx$genres, "Drama") == TRUE) %>% summarize(n = n())
-# drama no. of ratings = 3910127
-edx %>% filter(str_detect(edx$genres, "Comedy") == TRUE) %>% summarize(n = n())
-edx %>% filter(str_detect(edx$genres, "Romance") == TRUE) %>% summarize(n = n())
-edx %>% filter(str_detect(edx$genres, "Thriller") == TRUE) %>% summarize(n = n())
+No. of distinct users by rating
+```{r user_dist_rating, fig.cap = "Fig 1.3 # of unique users by ratings"}
+edx %>% group_by(rating) %>% summarize(n_user = n_distinct(userId)) %>%
+  ggplot(aes(x = rating, y = n_user)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label= n_user, vjust = -1.5)) +
+  scale_y_continuous(labels = label_number_si(), limits = c(0, 80000)) +
+  scale_x_continuous(labels = as.character(x) ,breaks = x) +
+  ylab("no of users") +
+  theme_ipsum()
+```
+
+Genre stats
+No. of unique genre combinations
+```{r n_distinct_genre_combo}
+n_genres_combo <- n_distinct(edx$genres)
+n_genres_combo
+```
+
+Genres that are available in the dataset include:
+```{r distinct_genres}
+n_drama <- edx %>% filter(str_detect(edx$genres, "Drama") == TRUE) %>% summarize(n = n())
+
+starttime <- Sys.time()
+
+genre_tab <- edx[,c(1:2,6)] %>% separate_rows(genres, sep = "\\|") %>%
+  group_by(genres) %>%
+  summarize(n_movies = n_distinct(movieId), n_ratings = n()) 
+endtime <- Sys.time()
+
+duration <- endtime - starttime
+duration #18.7mins 
+
+kable(genre_tab)
+```
+
+No. of movie ratings for Drama genre is `r n_drama`.
+
+```{r genre_mov_dist, fig.cap = "Fig 1.3 No. of movies by Genres" }
+p <- genre_tab %>% ggplot(aes(x = reorder(genres, -n_movies), y = n_movies)) +
+  geom_bar(stat = "identity")
+p <- p +
+  labs(x = "genres",
+       y = "# of movies") +
+  coord_flip() +
+  theme_classic() #most common genre is Drama
+p + geom_text(aes(label = n_movies), vjust = 0, hjust = -0.5) +
+  ylim(c(0, 6000))
+```
+```{r genre_combo_mov_dist, fig.cap = "Fig 1.4 Most Popular Genre Combinations"}
+p2 <- edx %>% group_by(genres) %>% 
+  summarize(n_movies = n_distinct(movieId)) %>%
+  filter(n_movies > 100) %>%
+  ggplot(aes(x = reorder(genres, -n_movies), y = n_movies)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = n_movies), hjust = -0.5) +
+  ylim(c(0,2000))
+p2 <- p2 + coord_flip() +
+  theme_classic() +
+  labs(y = "# of movies",
+       x = "genres")
+p2
+```
+
+Indicates in terms of genres, there is a higher proportion of movies in the database
+that are combination of drama, comedy romance. Followed by documentary & horror.
+
+# lets build a table of frequencies by genre 20X2 and 797x2 tables that is sorted
+
 
 #model answer
 # str_detect
@@ -156,7 +244,6 @@ edx %>%
   summarize(count = n()) %>%
   ggplot(aes(x = rating, y = count)) +
   geom_line()
-```
 
 When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
 
