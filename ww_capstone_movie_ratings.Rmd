@@ -1,18 +1,23 @@
 ---
 title: "Capstone - Movie Ratings Prediction"
-output: 
+output:
+  html_document:
+    toc: yes
+    df_print: paged
   html_notebook:
-    fig_caption: true
-    toc: true
-    toc_float: true
+    fig_caption: yes
+    toc: yes
+    toc_float: yes
 date: "`r format(Sys.time(), '%d %B %Y')`"
 ---
 
-```{r setup, include = FALSE, warning = FALSE}
-knitr::opts_chunk$set(fig.align = 'center', echo = TRUE)
+```{r setup, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE)
 ```
 
-# Project Overview
+# Executive Summary
 This is a capstone project for [HarvardX Data Science - Professional Certificate](http://rmarkdown.rstudio.com) program. 
 Objective of project is to create a move recommendation system using MovieLens dataset, using all tools (in particular ML algorithms) shown throught-out the HarvardX DS program.
 
@@ -21,11 +26,7 @@ Data assigned for this project is the 10 million ratings version of the [MovieLe
 There are 72K users in this dataset.
 The dataset is created as follows:
 
-```{r train_validation_dataset}
-if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
-if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
-if(!require(data.table)) install.packages("data.table", repos = "http://cran.us.r-project.org")
-install.packages("kableExtra")
+```{r lib_packages, warning=FALSE, message=FALSE}
 
 library(tidyverse)
 library(caret)
@@ -34,25 +35,29 @@ library(lubridate)
 library(stringr)
 library(knitr)
 library(kableExtra)
+```
+
+
+```{r train_validation_dataset, echo = TRUE}
 
 # MovieLens 10M dataset:
 # https://grouplens.org/datasets/movielens/10m/
 # http://files.grouplens.org/datasets/movielens/ml-10m.zip
 
-dl <- tempfile()
-download.file("http://files.grouplens.org/datasets/movielens/ml-10m.zip", dl)
+#dl <- tempfile()
+#download.file("http://files.grouplens.org/datasets/movielens/ml-10m.zip", dl)
 
-ratings <- fread(text = gsub("::", "\t", readLines(unzip(dl, "ml-10M100K/ratings.dat"))),
-                 col.names = c("userId", "movieId", "rating", "timestamp"))
+#ratings <- fread(text = gsub("::", "\t", readLines(unzip(dl, "ml-10M100K/ratings.dat"))),
+                 #col.names = c("userId", "movieId", "rating", "timestamp"))
 
-movies <- str_split_fixed(readLines(unzip(dl, "ml-10M100K/movies.dat")), "\\::", 3)
-colnames(movies) <- c("movieId", "title", "genres")
+#movies <- str_split_fixed(readLines(unzip(dl, "ml-10M100K/movies.dat")), "\\::", 3)
+#colnames(movies) <- c("movieId", "title", "genres")
 
 
 # if using R 4.0 or later:
-movies <- as.data.frame(movies) %>% mutate(movieId = as.numeric(movieId),
-                                           title = as.character(title),
-                                           genres = as.character(genres))
+#movies <- as.data.frame(movies) %>% mutate(movieId = as.numeric(movieId),
+                                           #title = as.character(title),
+                                           #genres = as.character(genres))
 
 
 movielens <- left_join(ratings, movies, by = "movieId")
@@ -80,10 +85,10 @@ validation <- temp %>%
 removed <- anti_join(temp, validation)
 edx <- rbind(edx, removed)
 
-rm(dl, ratings, movies, test_index, temp, movielens, removed)
+#rm(dl, ratings, movies, test_index, temp, movielens, removed)
 ```
 
-## Data familiarization
+#### Data familiarization
 
 ```{r dim}
 rows <- dim(edx)[1]
@@ -91,8 +96,8 @@ cols <- dim(edx)[2]
 ```
 The `edx` training dataset has `r rows` rows (number of ratings) and  `r cols` columns.  
 
-### Exploratory Data Analysis
-#### Rating Distribution
+#### Exploratory Data Analysis
+##### Rating Distribution
 
 Frequency distribution of ratings are shown in table 1 and figure 1 below:
 ```{r rating_freq_tab}
@@ -103,22 +108,24 @@ three_rating <- edx %>% filter(rating == 3) %>%
   nrow()
 kable(rft)
 ```
+
 No. of ratings given zero = `r zero_rating`.
 No. of ratings given three = `r three_rating`.
+Top 4 most given ratings in order from most to least - 4, 3, 5, 3.5, 2-; and Half star (.5) ratings are less common than whole stars.
 
 ```{r rating_hist, fig.cap = "Fig. 1.1 Freq. dist. of ratings."}
-library(hrbrthemes)
 library(scales)
 x <- seq(0, 5, 0.5)
 edx %>% ggplot(aes(x = rating)) +
-  geom_histogram(binwidth = 0.5, fill="#69b3a2", color="#e9ecef", alpha=0.9) +
+  geom_histogram(binwidth = 0.5, alpha=0.9) +
   stat_bin(binwidth = 0.5, geom ="text", aes(label = ..count..), vjust = -1.5) +
-  theme_ipsum() +
+  theme_classic() +
   scale_y_continuous(label = label_number_si(), limits = c(0, 3e6)) +
   scale_x_continuous(labels = as.character(x) ,breaks = x)
 ```
 
 No. of distinct movies rated = `r n_movies`.
+
 ```{r n_distinct_movies}
 n_movies <- n_distinct(edx$movieId)
 n_movies
@@ -132,7 +139,7 @@ edx %>% group_by(rating) %>% summarize(n_mov = n_distinct(movieId)) %>%
   ylim(0, 12500) +
   scale_x_continuous(labels = as.character(x) ,breaks = x) +
   ylab("no of movies") +
-  theme_ipsum()
+  theme_classic()
 ```
 
 No. of unique users = `r n_users`.
@@ -150,7 +157,7 @@ edx %>% group_by(rating) %>% summarize(n_user = n_distinct(userId)) %>%
   scale_y_continuous(labels = label_number_si(), limits = c(0, 80000)) +
   scale_x_continuous(labels = as.character(x) ,breaks = x) +
   ylab("no of users") +
-  theme_ipsum()
+  theme_classic()
 ```
 
 Genre stats
@@ -168,16 +175,41 @@ starttime <- Sys.time()
 
 genre_tab <- edx[,c(1:2,6)] %>% separate_rows(genres, sep = "\\|") %>%
   group_by(genres) %>%
-  summarize(n_movies = n_distinct(movieId), n_ratings = n()) 
+  summarize(n_movies = n_distinct(movieId), n_ratings = n(),
+            n_users = n_distinct(userId)) 
 endtime <- Sys.time()
 
 duration <- endtime - starttime
 duration #18.7mins 
+#is there a faster way? need to extract full list of genres follower by str_detect and sum.
 
-kable(genre_tab)
+kable(arrange(genre_tab, desc(n_movies),
+              desc(n_ratings),
+              desc(n_users)),
+      format = "html",
+      caption = "Table 1.1 ") %>%
+  kable_styling()
+
+genre_prop_tab <- genre_tab %>%
+  mutate(n_mov_prop = round(n_movies/sum(n_movies)*100, 1)) %>%
+  mutate(n_rat_prop = round(n_ratings/sum(n_ratings)*100, 1)) %>%
+  mutate(n_users_prop = round(n_users/sum(n_users)*100, 1)) %>%
+  select(n_mov_prop, n_rat_prop, n_users_prop)
+genre_prop_tab %>% kable(arrange(genre_tab, desc(n_mov_prop),
+              desc(n_rat_prop),
+              desc(n_users_prop)),
+      format = "html",
+      caption = "Table 1.2",
+      col.names = c("Genre", "% Freq Movies", "%Freq Ratings",
+                    "%Freq Users")) %>%
+  kable_styling()
 ```
 
 No. of movie ratings for Drama genre is `r n_drama`.
+```{r no_genre&imax_movie}
+#find out which movies are IMAX and no genre
+```
+
 
 ```{r genre_mov_dist, fig.cap = "Fig 1.3 No. of movies by Genres" }
 p <- genre_tab %>% ggplot(aes(x = reorder(genres, -n_movies), y = n_movies)) +
@@ -190,6 +222,8 @@ p <- p +
 p + geom_text(aes(label = n_movies), vjust = 0, hjust = -0.5) +
   ylim(c(0, 6000))
 ```
+
+
 ```{r genre_combo_mov_dist, fig.cap = "Fig 1.4 Most Popular Genre Combinations"}
 p2 <- edx %>% group_by(genres) %>% 
   summarize(n_movies = n_distinct(movieId)) %>%
@@ -208,43 +242,39 @@ p2
 Indicates in terms of genres, there is a higher proportion of movies in the database
 that are combination of drama, comedy romance. Followed by documentary & horror.
 
-# lets build a table of frequencies by genre 20X2 and 797x2 tables that is sorted
+```{r - n_ratings_by_movie}
+title_freqtab <- edx %>% group_by(title) %>% summarise(n = n()) %>% arrange(desc(n)) %>% head(50)
+title_freqtab
+
+movie_titles <- c("Forrest Gump", "Jurassic Park", "Pulp Fiction",
+                  "The Shawshank Redemptioin",
+                  "Speed 2: Cruise Control")
+
+edx %>% filter(title %in% movie_titles) %>%
+  group_by(title) %>%
+  summarize(count = n()) %>% arrange(desc(count))
+```
+
+## Movie Rating Prediction
+
+Movie ratings generated to be compared to true ratings in `r validation` set using RMSE
+
+### Method/Analysis
+```{r capstone_1}
+## check data type
+str(edx)
+## transform data type to appropriate data type
+## identified some problems with release year data - clean up
+# provide some description son rating date and rating hour derived from time stamp above.
+```
 
 
-#model answer
-# str_detect
-genres = c("Drama", "Comedy", "Thriller", "Romance")
-sapply(genres, function(g) {
-  sum(str_detect(edx$genres, g))
-})
+## Results
+```{r}
 
-# separate_rows, much slower!
-# edx %>% separate_rows(genres, sep = "\\|") %>%
-  #group_by(genres) %>%
-  #summarize(count = n()) %>%
-  #arrange(desc(count))
+```
 
-title <- edx %>% group_by(title) %>% summarise(n = n()) %>% arrange(desc(n))
-
-edx %>% group_by(movieId, title) %>%
-  summarize(count = n()) %>%
-  arrange(desc(count))
-
-edx %>% group_by(rating) %>% summarize(count = n()) %>% arrange(desc(count))
-
-#model answer
-edx %>% group_by(rating) %>% summarize(count = n()) %>% top_n(5) %>%
-  arrange(desc(count))
-
-check <- edx %>% mutate(status = if_else(rating %% 1 == 0, "whole", "half")) %>%
-                 group_by(status) %>% summarize(count = n())
-#model answer
-edx %>%
-  group_by(rating) %>%
-  summarize(count = n()) %>%
-  ggplot(aes(x = rating, y = count)) +
-  geom_line()
-
+## Conclusion
 When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
 
 The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
