@@ -1,13 +1,13 @@
 ---
 title: "Capstone - Movie Ratings Prediction"
 output:
-  html_document:
-    toc: yes
-    df_print: paged
   html_notebook:
     fig_caption: yes
     toc: yes
     toc_float: yes
+  html_document:
+    toc: yes
+    df_print: paged
 date: "`r format(Sys.time(), '%d %B %Y')`"
 ---
 
@@ -36,14 +36,15 @@ library(stringr)
 library(knitr)
 library(kableExtra)
 ```
+# Data Prep - Extract, transform, load train and validation set.
 
-
-```{r train_validation_dataset, echo = TRUE}
+```{r etl_stage, echo = TRUE}
 
 # MovieLens 10M dataset:
 # https://grouplens.org/datasets/movielens/10m/
 # http://files.grouplens.org/datasets/movielens/ml-10m.zip
 
+# data extraction as recommended on HarvardX
 #dl <- tempfile()
 #download.file("http://files.grouplens.org/datasets/movielens/ml-10m.zip", dl)
 
@@ -59,17 +60,18 @@ library(kableExtra)
                                            #title = as.character(title),
                                            #genres = as.character(genres))
 
-
 movielens <- left_join(ratings, movies, by = "movieId")
 
-#add features to original dataset, so test set has the same features
-#features- release year, title, rating date, rating hour
+# data transformation - cleaning 
+# UTC timestamp into date, identify movie release year
 movielens <- movielens %>%
-  mutate(release_yr = parse_number(str_split(title, pattern = "\\(", simplify = TRUE)[,2])) %>%
-  mutate(title = str_split(title, pattern = "\\(", simplify = TRUE)[,1]) %>%
-  mutate(rating_date = date(as_datetime(timestamp[1]))) %>%
-  mutate(rating_hour = hour(as_datetime(edx$timestamp[1])))
-
+  mutate(rating_timedate = as_datetime(timestamp)) %>% 
+  mutate(rating_date = date(as_datetime(timestamp))) %>% 
+  mutate(rating_hour = hour(as_datetime(timestamp))) %>% 
+  mutate(release_yr = parse_number(str_sub(title, -6, -1))) %>%
+  mutate(title = str_trim(str_sub(title, 1, -7))) %>%
+  select(-timestamp)
+  
 # Validation set will be 10% of MovieLens data
 set.seed(1, sample.kind="Rounding") # if using R 3.5 or earlier, use `set.seed(1)`
 test_index <- createDataPartition(y = movielens$rating, times = 1, p = 0.1, list = FALSE)
@@ -171,16 +173,16 @@ Genres that are available in the dataset include:
 ```{r distinct_genres}
 n_drama <- edx %>% filter(str_detect(edx$genres, "Drama") == TRUE) %>% summarize(n = n())
 
-starttime <- Sys.time()
+#starttime <- Sys.time()
 
-genre_tab <- edx[,c(1:2,6)] %>% separate_rows(genres, sep = "\\|") %>%
-  group_by(genres) %>%
-  summarize(n_movies = n_distinct(movieId), n_ratings = n(),
-            n_users = n_distinct(userId)) 
-endtime <- Sys.time()
+#genre_tab <- edx[,c(1:2,6)] %>% separate_rows(genres, sep = "\\|") %>%
+  #group_by(genres) %>%
+  #summarize(n_movies = n_distinct(movieId), n_ratings = n(),
+            #n_users = n_distinct(userId)) 
+#endtime <- Sys.time()
 
-duration <- endtime - starttime
-duration #18.7mins 
+#duration <- endtime - starttime
+#duration #18.7mins 
 #is there a faster way? need to extract full list of genres follower by str_detect and sum.
 
 kable(arrange(genre_tab, desc(n_movies),
@@ -260,17 +262,21 @@ edx %>% filter(title %in% movie_titles) %>%
 Movie ratings generated to be compared to true ratings in `r validation` set using RMSE
 
 ### Method/Analysis
-```{r capstone_1}
-## check data type
+```{r eda1}
+## check data type for both test and validation set may need to adjust above
 str(edx)
+str(validation)
+
 ## transform data type to appropriate data type
 ## identified some problems with release year data - clean up
 # provide some description son rating date and rating hour derived from time stamp above.
+# solve the knit on save issue, knit it now.
 ```
 
 
 ## Results
 ```{r}
+#features- release year, title, 
 
 ```
 
