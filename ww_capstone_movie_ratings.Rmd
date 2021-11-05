@@ -26,7 +26,7 @@ Data assigned for this project is the 10 million ratings version of the [MovieLe
 There are 72K users in this dataset.
 The dataset is created as follows:
 
-```{r lib_packages, warning=FALSE, message=FALSE}
+```{r lib_packages, include = FALSE, warning=FALSE, message=FALSE}
 
 library(tidyverse)
 library(caret)
@@ -35,6 +35,7 @@ library(lubridate)
 library(stringr)
 library(knitr)
 library(kableExtra)
+library(scales)
 ```
 # Data Prep - Extract, transform, load train and validation set.
 
@@ -263,20 +264,153 @@ Movie ratings generated to be compared to true ratings in `r validation` set usi
 
 ### Method/Analysis
 ```{r eda1}
-## check data type for both test and validation set may need to adjust above
-str(edx)
-str(validation)
 
-## transform data type to appropriate data type
-## identified some problems with release year data - clean up
-# provide some description son rating date and rating hour derived from time stamp above.
-# solve the knit on save issue, knit it now.
+edx %>% str() # overview of cleaned dataset
+edx[,c(3, 7, 8)] %>% summary() #overview of numerical data
+
+# enriching data to help in creating date/time based eda plots
+edx <- edx %>% mutate(rating_month = month(rating_date)) %>%
+  mutate(rating_year = year(rating_date)) %>%
+  mutate(rating_mmmyy = as.Date(format(rating_date, "%Y-%m-01")))
+
+rate_mmmyy <- edx %>% 
+  group_by(rating_mmmyy, rating_month, rating_year) %>%
+  summarize(count = n()) %>%
+  mutate(rating_month2 = as.Date(paste0("2022-", rating_month, "-01"), "%Y-%m-%d")) %>%
+  as.data.frame()
+
+# chart showing no. of ratings by month & year
+rate_mmmyy %>%
+  ggplot(aes(x = rating_month2, y = count)) +
+  geom_col() +
+  facet_wrap(~ rating_year, ncol = 3) +
+  labs(title = "Quantity of ratings over time",
+       subtitle = "by day",
+       y = "# of ratings ") +
+  theme(axis.title.x = element_blank()) +
+  scale_x_date(date_labels = "%b") +
+  scale_y_continuous(labels = comma)
+# data captures 14-15 years worth of ratings submitted from 1995 to 2009
+
+# chart showing movies that rate in terms of release years
+rate_mov_mmmyy <- edx %>%
+  group_by(release_yr) %>%
+  summarize(count = n()) %>%
+  mutate(release_yr2 = as.Date(paste0(release_yr, "-01", "-01"), "%Y-%m-%d")) %>%
+  as.data.frame()
+
+rate_mov_mmmyy %>% ggplot(aes(x = release_yr2, y = count)) +
+  geom_col() +
+  scale_x_date(date_breaks = "5 years", date_labels = "%Y") +
+  scale_y_continuous(labels = comma) +
+  labs(x = "Movie release year", y = "no. of ratings")
+# movies that receive most ratings are movies released in the years 1990 - 2000
+# movies released in 1995, received most no. of ratings
+
+# opportunity to introduce a % frequency
+edx %>% ggplot(aes(release_yr)) +
+  stat_ecdf(geom = "step", pad = FALSE) +
+  scale_x_binned(n.breaks = 20) +
+  labs( x = "Movie release year", y = "Cumulative % Freq",
+        title = "Empirical Cumulative Density Freq",
+        subtitle = "# of ratings over release year")
+
+# of movies released in each year?
+edx %>% group_by(release_yr) %>%
+  summarize(mov_count = n_distinct(movieId)) %>%
+  arrange(desc(mov_count)) %>%
+  ggplot(aes(x = release_yr, y = mov_count)) +
+  geom_col() + 
+  scale_x_continuous(breaks = round(seq(min(edx$release_yr), max(edx$release_yr), by = 5), 1))
+# chart shows that no. of movies released per year increase over time post 1990 
+# of movies releases per year increase 3x
+
+# exploring no. of ratings received based on age of movie
+edx_movage <- edx %>% mutate(mov_age = 2010 - release_yr) %>%
+  group_by(mov_age) %>%
+  summarize(mov_count = n_distinct(movieId),
+            n_ratings = n(),
+            arpmov = n_ratings/mov_count,
+            avg_rating = mean(rating),
+            var_rating = sd(rating),
+            n_users = n_distinct(userId),
+            anratingpu = n_ratings/n_users) %>%
+  arrange(desc(arpmov))
+
+u1 <- edx_movage %>% ggplot(aes(x = mov_age, colour = "A#RPU")) +
+  geom_line(aes(y = anratingpu))
+u1 <- u1 + geom_line(aes(y = n_users/6000, colour = "NUSERS"))
+u1 <- u1 + scale_y_continuous(sec.axis = sec_axis(~.*6000, name = "no. of users")) +
+  labs(y = "Avg # of ratings per user", x = "Age of Movie",
+       colour = "Parameter")
+u1 + theme(legend.position = c(0.8, 0.9))
+#interested to see correlation between
+# no. of ratings and variance of ratings
+cor(edx_movage$n_ratings, edx_movage$var_rating)
+cor(edx_movage$mov_age, edx_movage$var_rating)
+
+p <- cor(edx_movage)
+corrplot::corrplot(p)
+# as movie age increases, less #of movies, ratings, # of ratings per movie,
+# avg rating increases, but there is less variance and less no. of distinct users
+
+edx_movage %>% ggplot(aes(x = mov_age, y = arpmov)) +
+  geom_point() +
+  scale_x_continuous(breaks = c(seq(0, max(edx_movage$mov_age + 10), 5))) +
+  scale_y_continuous(labels = comma) +
+  ylab("Avg # of rating per movie") +
+  xlab("Age of movie")
+
+p1 <- edx_movage %>% ggplot(aes(x = as.factor(mov_age), y = avg_rating)) +
+  geom_point() +
+  scale_y_continuous(breaks = c(seq(0, 5, 0.5))) +
+  ylim(0, 5)
+p1
+
+#older movies seem to have a higher average score s-curve
+set.seed(1, sample.kind="Rounding")
+p2 <- edx %>% sample_n(10000) %>%
+  mutate(mov_age = 2010 - release_yr) %>%
+  mutate(mov_age = as.factor(mov_age)) %>%
+  ggplot(aes(x = mov_age, y = rating)) +
+  geom_boxplot() +
+  geom_jitter(size = 0.05, alpha = 0.5) 
+p2
+
+p3 <- edx %>% sample_n(10000) %>%
+  mutate(mov_age = 2010 - release_yr) %>%
+  ggplot(aes(x = rating, y = mov_age)) + 
+  geom_violin() +
+  scale_y_continuous(breaks = c(seq(0, 100, 5)))
+p3 # movies between 10 & 20 yrs of age have higher diversity (variance) of ratings
+
+edx %>% 
+
+# chart showing no. of ratings submitted by time (hour) of day
+edx %>% ggplot(aes(rating_hour)) +
+  geom_histogram() +
+  scale_x_continuous(breaks = c(seq(0,23, 1)))
+
+
+edx %>% group_by(rating_hour) %>%
+  summarize(avgrating_byhr = mean(rating))
+#rating average pretty constant across hour of day
+
+# candlesticks chart see any variation within hour of day
+set.seed(1, sample.kind="Rounding")
+edx %>% sample_n(10000) %>% ggplot(aes(x = as.factor(rating_hour), y = rating)) +
+  geom_boxplot() +
+  geom_jitter(size = 0.05, alpha = 0.5)
+
+n_users*n_movies # of possible ratings 746.09M
+# spare matrix (randomly select 100 movies and 100 users) -> create image plot
+# plot of no. of ratings vs users and movies
 ```
 
 
 ## Results
 ```{r}
-#features- release year, title, 
+
 
 ```
 
