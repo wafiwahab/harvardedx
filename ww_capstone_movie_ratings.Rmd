@@ -263,8 +263,7 @@ edx %>% filter(title %in% movie_titles) %>%
 Movie ratings generated to be compared to true ratings in `r validation` set using RMSE
 
 ### Method/Analysis
-```{r eda1}
-
+```{r eda_timedate}
 edx %>% str() # overview of cleaned dataset
 edx[,c(3, 7, 8)] %>% summary() #overview of numerical data
 
@@ -402,9 +401,70 @@ edx %>% sample_n(10000) %>% ggplot(aes(x = as.factor(rating_hour), y = rating)) 
   geom_boxplot() +
   geom_jitter(size = 0.05, alpha = 0.5)
 
+#age of userid first rating any relationship with rating score? & # of ratings
+# i.e. proxy for user's (maturity (age/time) in rating movies)
+#may need an overall corrplot of relationship of features
+edxusermaturity <- edx %>% group_by(userId) %>%
+  summarize(first_rating = min(rating_date),
+            avg_rating = mean(rating))
+            
+edxusermaturity <- edxusermaturity %>%
+  mutate(user_maturity = Sys.Date() - first_rating) %>%
+  arrange(desc(user_maturity)) %>%
+  select(userId, user_maturity, avg_rating)
+
+edxusermaturity %>% ggplot(aes(x = user_maturity, y = avg_rating)) +
+  geom_point() #no discernible pattern
+
+edx <- edx %>% left_join(edxusermaturity, by = "userId") #add newfeature to main dataset
+tail(edx) #check
+
+edx %>% ggplot(aes(x = user_maturity, y = rating)) +
+  geom_point() # no discernible pattern
+
+```
+
+
+```{r eda_userId}
+# plot of no. of ratings vs users and movies
+edxuser <- edx %>% group_by(userId) %>% 
+  summarize(n_rating = n(),
+            n_movies = n_distinct(movieId), 
+            n_ratingdate = n_distinct(rating_date),
+            avg_rating = mean(rating),
+            sd_rating = sd(rating)) %>% 
+  arrange(desc(n_rating))
+
+head(edxuser)
+tail(edxuser)
+summary(edxuser[,2:4]) # the average user submits 128 ratings over 6 days
+# minimum no. of ratings submitted by user is 10 and max 6,616 done over 1185 days (3yrs)
+
+sum(edxuser$n_rating > edxuser$n_movies) #check no duplicate rating by user
+sum(edxuser$n_rating < edxuser$n_ratingdate) #users typically rate multiple movies per day
+
+edxuser %>% ggplot(aes(x = n_rating)) +
+  geom_histogram(binwidth = 1) +
+  geom_density()
+
+# is there a relationship between freq of rating and rating score
+edxuser %>% ggplot(aes(x = n_rating, y =  avg_rating)) +
+  geom_point() # no discernible pattern
+
+edxuser %>% filter(n_rating < 1000) %>%
+  ggplot(aes(x = n_rating, y =  sd_rating)) +
+  geom_point() # no discernible pattern
+```
+
+```{r eda_moviedId & genres}
+
+```
+
+
+```{r spare matrix}
 n_users*n_movies # of possible ratings 746.09M
 # spare matrix (randomly select 100 movies and 100 users) -> create image plot
-# plot of no. of ratings vs users and movies
+
 ```
 
 
