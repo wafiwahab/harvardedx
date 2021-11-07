@@ -457,6 +457,71 @@ edxuser %>% filter(n_rating < 1000) %>%
 ```
 
 ```{r eda_moviedId & genres}
+edx_mov <- edx %>% 
+  mutate(release_vs_rating_datediff = year(rating_date) - release_yr) %>%
+  mutate(mov_age = 2010 - release_yr) %>%
+  group_by(movieId) %>%
+  summarize(n_rating = n(), avg_rating = mean(rating), sd_rating = sd(rating),
+            n_user = n_distinct(userId),
+            max_memory_yr = max(release_vs_rating_datediff),
+            avg_memory_yr = mean(release_vs_rating_datediff),
+            min(mov_age))
+edx_mov
+```
+```{r eda_movieId #2}
+edx_mov %>% ggplot(aes(x = n_rating)) +
+  geom_point(aes(y = sd_rating, colour = "sd")) +
+  geom_point(aes(y = (avg_rating/2), colour = "avg"), alpha = 0.5) +
+  scale_y_continuous(sec.axis = sec_axis(~.*2, name = "avg rating")) +
+  theme(legend.position = c(0.8, 0.9))
+# avg and sd rating pretty doesnt change based on no. of ratings.
+```
+
+
+```{r eda_movieId #3}
+edx_mov %>% filter(n_rating < 1000) %>%
+  ggplot(aes(x = n_rating)) +
+  geom_histogram(binwidth = 1)
+```
+
+```{r eda_movieId #4}
+edx_mov %>% ggplot(aes(x = n_rating)) +
+  geom_histogram(binwidth = 50)
+```
+
+```{r eda_movieId #5}
+min <- min(edx_mov$n_rating)
+max <- max(edx_mov$n_rating)
+diff <- max - min
+bins <- seq(min, max, by = round(diff/50, 0))
+ratebins <- cut(edx_mov$n_rating, bins) # group data into bins
+freq_table <- transform(table(ratebins))
+transform(freq_table, rel_freq = prop.table(Freq), cum_freq = cumsum(rel_freq))
+hist(edx_mov$n_rating, freq = TRUE, 
+     breaks = seq(0, 35000, by = round(35000/50, 0)),
+     main = "Freq dist of movies by # of ratings")
+
+freq <- table(edx_mov$n_rating)
+cumsum <- cumsum(freq)
+prob <- prop.table(freq)
+cumdist <- cumsum(prob)
+plot(cumdist)
+which(round(cumdist, 2) == 0.75) # 75% of movies have less than 580 ratings
+cumdist[500] #73% of movies have less than 502 ratings
+```
+
+```{r}
+edx_mov %>% group_by(n_rating) %>%
+  summarise(n_mov = n_distinct(movieId))
+```
+```{r}
+edx_mov %>% ggplot(aes(x = n_rating)) +
+  stat_ecdf(geom = "point")
+```
+```{r eda_all_features #corrplot}
+edx_corr <- cor(edx)
+# i need to change this only to include numeric columns and append additional features 
+# to each row by userId
 
 ```
 
